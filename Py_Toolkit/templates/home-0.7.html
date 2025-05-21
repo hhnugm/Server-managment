@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Server Monitoring Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.0/css/bootstrap.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      background-color: #e0f7fa;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .container {
+      background-color: #ffffff;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      max-width: 90%;
+    }
+
+    .display-4 {
+      color: #0056b3;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .list-group-item {
+      background-color: #f8f9fa;
+      border: none;
+      font-weight: 500;
+      font-size: 1.1rem;
+    }
+
+    .list-group-item:hover {
+      background-color: #d6f5f5;
+    }
+
+    .btn-monitor { background-color: #ff9800; color: white; }
+    .btn-online { background-color: #007bff; color: white; }
+    .btn-db { background-color: #28a745; color: white; }
+    .btn-html5 { background-color: #ffc107; color: white; }
+    .btn-power-on { background-color: #17a2b8; color: white; }
+    .btn-power-off { background-color: #dc3545; color: white; }
+    .btn-reboot { background-color: #ffc107; color: white; }
+    .btn-shutdown { background-color: #6c757d; color: white; }
+    .btn-bmc-get { background-color: #00695c; color: white; }       /* 新增 取得BMC Token */
+    .btn-bmc-release { background-color: #c62828; color: white; }   /* 新增 釋放BMC Token */
+
+    .btn:hover { opacity: 0.9; }
+
+    .logo {
+      width: 150px;
+      height: auto;
+    }
+
+    .badge-status {
+      font-size: 0.9rem;
+      padding: 0.4em 0.6em;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      user-select: none;
+    }
+
+    .status-online { color: #28a745; border-color: #28a745; }
+    .status-offline { color: #dc3545; border-color: #dc3545; }
+    .status-unknown { color: #6c757d; border-color: #6c757d; }
+
+    footer {
+      background-color: #f1f1f1;
+      text-align: center;
+      padding: 10px;
+      margin-top: 30px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    /* 針對 BMC token 結果顯示區 */
+    #token-result {
+      margin-top: 10px;
+      font-weight: 600;
+      min-height: 24px;
+      color: #004d40;
+      user-select: text;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-5">
+    <div class="d-flex align-items-center mb-3">
+      <img src="https://www.supermicro.com/sites/default/files/Super_Micro_Computer_Logo.svg" class="logo mr-3" alt="Supermicro Logo" />
+      <h2 class="display-4">Rack Burn-In PXE Monitoring Dashboard</h2>
+    </div>
+
+    <!-- BMC Token 管理區塊，已移至標題下方 -->
+    <div class="mb-4">
+      <h4>BMC Token 管理</h4>
+      <div class="form-group">
+        <label for="select-hostname-bmc">選擇伺服器</label>
+        <select id="select-hostname-bmc" class="form-control w-50">
+          {% for name in servers.keys() %}
+            <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button id="btn-get-token" class="btn btn-bmc-get mr-2">取得BMC Token (登入BMC)</button>
+      <button id="btn-release-token" class="btn btn-bmc-release">釋放BMC Token (登出BMC)</button>
+
+      <div id="token-result" aria-live="polite" role="status"></div>
+    </div>
+
+    <!-- 伺服器列表 -->
+    <ul class="list-group shadow-sm mb-4">
+      {% for name, server in servers.items() %}
+      <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap">
+        <div class="d-flex align-items-center flex-grow-1">
+          <span class="font-weight-bold mr-3">{{ name }}</span>
+          {% set status = ping_status.get(name) %}
+          {% if status %}
+            {% if "🟢" in status %}
+              <span class="badge-status status-online">{{ status }}</span>
+            {% elif "🔴" in status %}
+              <span class="badge-status status-offline">{{ status }}</span>
+            {% else %}
+              <span class="badge-status status-unknown">⏳ Loading</span>
+            {% endif %}
+          {% else %}
+            <span class="badge-status status-unknown">⏳ Loading</span>
+          {% endif %}
+        </div>
+        <div class="btn-group mt-2 mt-sm-0">
+          <a href="{{ url_for('monitor', hostname=name) }}" class="btn btn-monitor btn-sm" role="button" aria-label="管理者登入 {{ name }}">管理者登入</a>
+          <a href="{{ url_for('online', hostname=name) }}" class="btn btn-online btn-sm" role="button" aria-label="PXE-DHCP-配發狀態 {{ name }}">PXE-DHCP-配發狀態</a>
+          <a href="{{ url_for('db_connection', hostname=name) }}" class="btn btn-db btn-sm" role="button" aria-label="PXE資料庫檢索 {{ name }}">PXE資料庫檢索</a>
+          <button class="btn btn-power-on btn-sm btn-power" data-host="{{ name }}" data-action="on" aria-label="開機 {{ name }}">開機</button>
+          <button class="btn btn-power-off btn-sm btn-power" data-host="{{ name }}" data-action="gracefulshutdown" aria-label="優雅關機 {{ name }}">優雅關機</button>
+          <button class="btn btn-reboot btn-sm btn-power" data-host="{{ name }}" data-action="gracefulrestart" aria-label="重開機 {{ name }}">重開機</button>
+          <button class="btn btn-shutdown btn-sm btn-power" data-host="{{ name }}" data-action="forceoff" aria-label="暴力關機 {{ name }}">暴力關機</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+  </div>
+
+  <footer>
+    <p>&copy; Jerry Peng - TW (RACK)</p>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      // 電源控制按鈕事件
+      const actionText = {
+        on: "開機",
+        gracefulshutdown: "優雅關機",
+        gracefulrestart: "重開機",
+        forceoff: "暴力關機"
+      };
+
+      document.querySelectorAll(".btn-power").forEach(button => {
+        button.addEventListener("click", function (e) {
+          e.preventDefault();
+          const action = this.getAttribute("data-action");
+          const hostname = this.getAttribute("data-host");
+          const confirmMsg = `確定要對 ${hostname} 執行 ${actionText[action]} 嗎？`;
+          if (!confirm(confirmMsg)) return;
+
+          const btn = this;
+          const originalText = btn.innerText;
+          btn.disabled = true;
+          btn.innerText = "執行中...";
+
+          fetch(`/redfish/${hostname}/${action}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          })
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+          })
+          .then(data => {
+            if (data.status === 200) {
+              alert(`${hostname} ${actionText[action]} 成功`);
+            } else {
+              alert(`操作失敗: ${JSON.stringify(data)}`);
+            }
+          })
+          .catch(err => {
+            alert(`發生錯誤: ${err.message || err}`);
+          })
+          .finally(() => {
+            btn.disabled = false;
+            btn.innerText = originalText;
+          });
+        });
+      });
+
+      // BMC Token 管理按鈕事件
+      const selectHostnameBmc = document.getElementById("select-hostname-bmc");
+      const tokenResult = document.getElementById("token-result");
+
+      function fetchBmcToken(action) {
+        const hostname = selectHostnameBmc.value;
+        if (!hostname) {
+          alert("請先選擇伺服器");
+          return;
+        }
+        tokenResult.innerText = action === "get" ? "取得中..." : "釋放中...";
+        fetch(`/bmc/${hostname}/token`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({action: action})
+        })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          if (data.status === "success") {
+            if (action === "get") {
+              tokenResult.innerText = "Token: " + data.token;
+            } else {
+              tokenResult.innerText = "Token 釋放成功";
+            }
+          } else {
+            tokenResult.innerText = "錯誤: " + (data.error || "未知錯誤");
+          }
+        })
+        .catch(err => {
+          tokenResult.innerText = "請求失敗: " + err.message || err;
+        });
+      }
+
+      document.getElementById("btn-get-token").addEventListener("click", () => fetchBmcToken("get"));
+      document.getElementById("btn-release-token").addEventListener("click", () => fetchBmcToken("release"));
+    });
+  </script>
+</body>
+</html>

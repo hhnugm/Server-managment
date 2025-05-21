@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring {{ hostname }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.0/css/bootstrap.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #e0f7fa;
+            font-family: 'Roboto', sans-serif;
+            letter-spacing: 0.5px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            overflow-x: auto;
+        }
+        .display-4 {
+            color: #4682b4;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .btn-outline-primary:hover {
+            background-color: #4682b4;
+            color: white;
+        }
+        th {
+            background-color: #4682b4;
+            color: white;
+        }
+        td {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .logo {
+            width: 150px;
+            height: auto;
+        }
+        .header-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        footer {
+            background-color: #f1f1f1;
+            text-align: center;
+            padding: 10px;
+            margin-top: 30px;
+        }
+        #connectionCount {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="header-section mb-3">
+            <img src="https://www.supermicro.com/sites/default/files/Super_Micro_Computer_Logo.svg" class="logo" alt="Supermicro Logo">
+            <h2 class="display-4">Monitoring {{ hostname }}</h2>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <a href="{{ url_for('home') }}" class="btn btn-outline-primary">回到主頁</a>
+            <button onclick="connectSSH('{{ hostname }}')" class="btn btn-outline-primary">SSH連線</button>
+        </div>
+
+        {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <!-- 使用者登入清單 -->
+        <h4 class="mt-4">管理者名單</h4>
+        <p>目前連線人數：<strong id="connectionCount">{{ total_processes }}</strong></p>
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>PID</th>
+                    <th>TTY</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for process in processes %}
+                    <tr>
+                        <td>{{ process.user }}</td>
+                        <td>{{ process.pid }}</td>
+                        <td>{{ process.tty }}</td>
+                        <td>
+                            <form action="{{ url_for('kill_process', hostname=hostname, pid=process.pid) }}" method="post" style="display:inline;">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">登出使用者</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- MySQL 連線資訊 -->
+        <h4 class="mt-4">DB 連線清單</h4>
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Host</th>
+                    <th>DB</th>
+                    <th>Command</th>
+                    <th>Time</th>
+                    <th>Info</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for process in mysql_processes %}
+                    <tr>
+                        <td>{{ process.user }}</td>
+                        <td>{{ process.host }}</td>
+                        <td>{{ process.db }}</td>
+                        <td>{{ process.command }}</td>
+                        <td>{{ process.time }}</td>
+                        <td>{{ process.info }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        <p>Copyright &copy; Jerry Peng - TW (RACK)</p>
+    </footer>
+
+    <!-- SSH 呼叫 script -->
+    <script>
+function connectSSH(hostname) {
+    fetch(`/ssh/${hostname}`, {
+        method: 'POST'
+    })
+    .then(response => response.text())
+    .then(data => {
+        alert('SSH 連線請求已發送。請確認本機是否成功開啟 PowerShell。');
+        location.reload();  // 使用者點「確認」後這行才會執行
+    })
+    .catch(error => {
+        alert('SSH 連線發生錯誤：' + error);
+        location.reload();  // 即使錯誤也重新載入（可選）
+    });
+}
+</script>
+</body>
+</html>

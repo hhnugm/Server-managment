@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Server Monitoring Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.0/css/bootstrap.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      background-color: #e0f7fa;
+      font-family: 'Roboto', sans-serif;
+    }
+    .container {
+      background-color: #ffffff;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      max-width: 90%;
+    }
+    .display-4 {
+      color: #0056b3;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .list-group-item {
+      background-color: #f8f9fa;
+      border: none;
+      font-weight: 500;
+      font-size: 1.1rem;
+    }
+    .list-group-item:hover {
+      background-color: #d6f5f5;
+    }
+    .btn-monitor { background-color: #ff9800; color: white; }
+    .btn-online { background-color: #007bff; color: white; }
+    .btn-db { background-color: #28a745; color: white; }
+    .btn-power-on { background-color: #17a2b8; color: white; }
+    .btn-power-off { background-color: #dc3545; color: white; }
+    .btn-reboot { background-color: #ffc107; color: white; }
+    .btn-shutdown { background-color: #6c757d; color: white; }
+    .btn:hover { opacity: 0.9; }
+    .logo {
+      width: 150px;
+      height: auto;
+    }
+    .badge-status {
+      font-size: 0.9rem;
+      padding: 0.4em 0.6em;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      min-width: 90px;
+      justify-content: center;
+    }
+    .status-online { color: #28a745; border-color: #28a745; }
+    .status-offline { color: #dc3545; border-color: #dc3545; }
+    .status-unknown { color: #6c757d; border-color: #6c757d; }
+    footer {
+      background-color: #f1f1f1;
+      text-align: center;
+      padding: 10px;
+      margin-top: 30px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-5">
+    <div class="d-flex align-items-center mb-3">
+      <img src="https://www.supermicro.com/sites/default/files/Super_Micro_Computer_Logo.svg" class="logo mr-3" alt="Supermicro Logo" />
+      <h2 class="display-4">Rack Burn-In PXE Monitoring Dashboard</h2>
+    </div>
+
+    <ul class="list-group shadow-sm mb-4">
+      <!-- 假設 Flask 傳入的 servers 是 dict，這裡用 Jinja2 語法 -->
+      {% for name, server in servers.items() %}
+      <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap">
+        <div class="d-flex align-items-center flex-grow-1">
+          <span class="font-weight-bold mr-3">{{ name }}</span>
+          <span class="badge-status status-unknown" id="status-{{ name }}">
+            <span class="spinner-border spinner-border-sm text-secondary mr-1" role="status" aria-hidden="true"></span>
+            <span class="status-text">Loading</span>
+          </span>
+        </div>
+        <div class="btn-group mt-2 mt-sm-0">
+          <button class="btn btn-monitor btn-sm btn-action" data-url="{{ url_for('monitor', hostname=name) }}">管理者登入</button>
+          <button class="btn btn-online btn-sm btn-action" data-url="{{ url_for('online', hostname=name) }}">PXE-DHCP-配發狀態</button>
+          <button class="btn btn-db btn-sm btn-action" data-url="{{ url_for('db_connection', hostname=name) }}">PXE資料庫檢索</button>
+
+          <button class="btn btn-power-on btn-sm btn-power" data-host="{{ name }}" data-action="on">開機</button>
+          <button class="btn btn-power-off btn-sm btn-power" data-host="{{ name }}" data-action="gracefulshutdown">優雅關機</button>
+          <button class="btn btn-reboot btn-sm btn-power" data-host="{{ name }}" data-action="gracefulrestart">重開機</button>
+          <button class="btn btn-shutdown btn-sm btn-power" data-host="{{ name }}" data-action="forceoff">暴力關機</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <footer>
+    <p>&copy; Jerry Peng - TW (RACK)</p>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const actionText = {
+        on: "開機",
+        gracefulshutdown: "優雅關機",
+        gracefulrestart: "重開機",
+        forceoff: "暴力關機"
+      };
+
+      // 電源控制按鈕
+      document.querySelectorAll(".btn-power").forEach(button => {
+        button.addEventListener("click", function () {
+          const action = this.getAttribute("data-action");
+          const hostname = this.getAttribute("data-host");
+          const confirmMsg = `確定要對 ${hostname} 執行 ${actionText[action]} 嗎？`;
+          if (!confirm(confirmMsg)) return;
+
+          const btn = this;
+          const originalText = btn.innerText;
+          btn.disabled = true;
+          btn.innerText = "執行中...";
+
+          fetch(`/redfish/${hostname}/${action}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          })
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+          })
+          .then(data => {
+            if (data.status === 200) {
+              alert(`${hostname} ${actionText[action]} 成功`);
+            } else {
+              alert(`操作失敗: ${JSON.stringify(data)}`);
+            }
+          })
+          .catch(err => {
+            alert(`發生錯誤: ${err.message || err}`);
+          })
+          .finally(() => {
+            btn.disabled = false;
+            btn.innerText = originalText;
+          });
+        });
+      });
+
+      // 其他功能按鈕（管理者登入、配發狀態、資料庫檢索）
+      document.querySelectorAll(".btn-action").forEach(button => {
+        button.addEventListener("click", function () {
+          const url = this.getAttribute("data-url");
+          const hostname = url.split("/").pop();
+          this.disabled = true;
+          const originalText = this.innerText;
+          this.innerText = "載入中...";
+
+          let didTimeout = false;
+
+          const timeout = setTimeout(() => {
+            didTimeout = true;
+            window.location.href = `/troubleshoot?hostname=${hostname}`;
+          }, 4000); // 4 秒
+
+          fetch(url, {
+            method: "GET",
+            headers: { "Accept": "text/html" }
+          })
+          .then(res => {
+            if (didTimeout) return;
+            clearTimeout(timeout);
+            if (!res.ok) throw new Error("網頁載入失敗");
+            return res.text();
+          })
+          .then(() => {
+            if (!didTimeout) window.location.href = url;
+          })
+          .catch(() => {
+            window.location.href = `/troubleshoot?hostname=${hostname}`;
+          })
+          .finally(() => {
+            this.disabled = false;
+            this.innerText = originalText;
+          });
+        });
+      });
+
+      // 狀態輪詢，直到全部非 Loading/Unknown，再每 10 分鐘更新一次
+      let pollingTimer = null;
+
+      function allStatusesReady() {
+        return [...document.querySelectorAll(".badge-status .status-text")]
+          .every(elem => {
+            const txt = elem.textContent.trim().toLowerCase();
+            return txt !== "loading" && txt !== "unknown" && txt !== "unknow";
+          });
+      }
+
+      function fetchAndUpdateStatuses() {
+        return fetch("/api/ping_status")
+          .then(res => res.json())
+          .then(data => {
+            for (const badge of document.querySelectorAll(".badge-status")) {
+              const hostname = badge.id.replace("status-", "");
+              const spinner = badge.querySelector(".spinner-border");
+              const textElem = badge.querySelector(".status-text");
+
+              if (data.hasOwnProperty(hostname)) {
+                const status = data[hostname];
+                if (status.toLowerCase() === "unknown" || status.toLowerCase() === "unknow") {
+                  spinner.style.display = "";
+                  textElem.textContent = "Loading";
+                  badge.classList.remove("status-online", "status-offline");
+                  badge.classList.add("status-unknown");
+                } else {
+                  spinner.style.display = "none";
+                  textElem.textContent = status;
+                  badge.classList.remove("status-unknown", "status-online", "status-offline");
+                  if (status.includes("🟢")) {
+                    badge.classList.add("status-online");
+                  } else if (status.includes("🔴")) {
+                    badge.classList.add("status-offline");
+                  } else {
+                    badge.classList.add("status-unknown");
+                  }
+                }
+              } else {
+                spinner.style.display = "";
+                textElem.textContent = "Loading";
+                badge.classList.remove("status-online", "status-offline");
+                badge.classList.add("status-unknown");
+              }
+            }
+          })
+          .catch(err => {
+            console.error("狀態載入失敗：", err);
+            for (const badge of document.querySelectorAll(".badge-status")) {
+              const spinner = badge.querySelector(".spinner-border");
+              const textElem = badge.querySelector(".status-text");
+              spinner.style.display = "";
+              textElem.textContent = "Loading";
+              badge.classList.remove("status-online", "status-offline");
+              badge.classList.add("status-unknown");
+            }
+          });
+      }
+
+      function pollingUntilReady() {
+        fetchAndUpdateStatuses().then(() => {
+          if (!allStatusesReady()) {
+            pollingTimer = setTimeout(pollingUntilReady, 2000);
+          } else {
+            if (pollingTimer) {
+              clearTimeout(pollingTimer);
+              pollingTimer = null;
+            }
+            console.log("所有狀態已更新完成！");
+            pollingTimer = setInterval(fetchAndUpdateStatuses, 600000); // 每 600 秒 (10分鐘) 更新一次
+          }
+        });
+      }
+
+      setTimeout(pollingUntilReady, 2000); // 頁面載入 2 秒後開始第一次輪詢
+    });
+  </script>
+</body>
+</html>

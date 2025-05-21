@@ -1,0 +1,15 @@
+虛擬化技術
+作業系統 開機引導GRUB 類型的OS設置
+sudo vi /etc/default/grub
+修改注意CPU類型
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash amd_iommu=on"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash intel_iommu=on"
+sudo update-grub
+重開機後驗證
+dmesg | grep -e DMAR -e IOMMU
+
+
+cat /etc/modprobe.d/vfio.conf
+options vfio-pci ids=01:00.0,41:00.0,81:00.0,c1:00.0
+sudo update-initramfs -u
+

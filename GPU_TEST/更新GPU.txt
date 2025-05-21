@@ -1,0 +1,4 @@
+curl -k -u root:0penBmc -X POST \
+-H "Content-Type: application/json" \
+-d '{"ResetType": "On"}' \
+https://10.10.1.142/redfish/v1/Systems/system/Actions/ComputerSystem.Reset

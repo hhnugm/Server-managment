@@ -1,0 +1,28 @@
+nvidia-smi mig –help
+nvidia-smi
+
+fieldiag 
+
+“Running test X on GPU n - Y tests remaining |======= | Z %”
+Where:
+X is the current test number in the sequence 
+n is the GPU number 
+Y is the number of remaining tests 
+Z is the overall percent completion
+Example:
+Running test 208 on GPU 0 - 118 tests remaining |=========== | 64 
+
+
+A typical GPU test performs the following operations:
+1. Disable the windowing system to take over the entire screen.
+2. Set the display mode and refresh rate.
+3. Loop N times:
+a. Exercise some aspect of the graphics hardware.
+b. Read back the resulting image. 
+c. Calculate a 32-bit CRC, or possibly a checksum, to compare against the known 
+correct value (golden value) for this GPU version and platform. For video and 
+cursor tests use the hardware DAC CRC.
+d. If the golden values do not match, report an error and abort the loop. 
+4. Restore previous display mode and refresh rate.
+5. Release screen to the operating system.
+6. Report test status

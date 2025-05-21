@@ -1,0 +1,22 @@
+PCI [Bus Dev [Func] [-s Seg] [-i]]
+
+    Bus      - Bus number
+    Dev      - Device number
+    Func     - Function number
+    -s          - Optional segment number specified
+    Seg       - Segment number
+    -i           - Information interpreted
+
+Note:
+    1. If no parameters are specified all PCI devices will be listed.
+    2. If the Bus and Device number parameters are specified while the
+       Function or Segment parameters are not, Function or Segment will
+       be set as default value 0.
+    3. The '-i' option can be used to display verbose information for the
+       specified PCI device. The PCI configuration space for the specified
+       device will be dumped with a detailed interpretation.
+
+Examples:
+
+* To display all PCI devices in the system:
+Shell> PCI

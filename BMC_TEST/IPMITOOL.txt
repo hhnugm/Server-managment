@@ -1,0 +1,17 @@
+=============== Remote Operation ======================
+ipmitool -H <BMC_IP> -I lanplus -U <username> -P <password> <your command>
+
+=============== Rawdata dump ============
+ipmitool -H <BMC_IP> -I lanplus -U username -P password save *.txt
+
+=============== Loacl reset cold BMC ====================
+sudo ipmitool mc reset cold
+
+=============== Loacl reset factory default =============
+sudo ipmitool raw 0x32 0x66
+
+=============== OEM command AC off ======================
+ipmitool raw 0x30 0x70 0xf8 0x27
+
+=============== Call Solcon =============================
+ipmitool -I lanplus -H <BMC_IP> -U <username> -P <password> sol activate
